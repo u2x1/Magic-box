@@ -50,7 +50,7 @@ void encode(string &contain, string &secret){
 	// Skip info tag.
     for(int i = 0; i < 3; ++i)
         pos = findNextFrame(contain, pos + 1);
-    // for(int i = 0; i < 100; ++i){
+
     string header = cp_cr8_header(contain, getBitrate(contain, pos), getSample(contain, pos));
 
     size_t len = getFrameLen(header, 0) - 4;
@@ -113,7 +113,7 @@ string readFile(char path[]) {
         fclose(pFile);
     }
     else
-        cout << "error: Open file failed." << endl;
+        cout << "error: Failed to open " + string(path) + "." << endl;
 	return content;
 }
 
@@ -125,7 +125,7 @@ void writeFile(string& content, string file_name) {
         cout << "File has been saved as: " << file_name << endl;
     }
     else
-        cout << "error: Write file failed." << endl;
+        cout << "error: Failed to write file to " + file_name + "." << endl;
 }
 
 size_t findNextFrame(string &carry, size_t offset = 0) {
@@ -140,6 +140,18 @@ size_t findNextFrame(string &carry, size_t offset = 0) {
 size_t getFrameLen(const string &content, size_t headerPos = 0){
     return getBitrate(content, headerPos) * 144 / getSample(content, headerPos);
 }
+
+// Create a frame that is unavailable to play: with bad bit rate and reserved sample rate
+string cp_cr8_header(string &content, int oriBitrate, int oriSamprate){
+	size_t pos = ((content[6] & 0x7F) << 21) + ((content[7] & 0x7F) << 14) + ((content[8] & 0x7F) << 7) + (content[9] & 0x7F) + 10;
+    // Skip info tag
+    for(int i = 0; i < 2; ++i)
+        pos = findNextFrame(content, pos + 1);
+    string header = content.substr(pos, 4);
+    header[2] |= 0xfc;
+    return header;
+}
+
 unsigned int getSample(const string &content, size_t pos = 0) {
     pos += 2;
     unsigned long long i = static_cast<unsigned long long>(content[pos]);
@@ -154,17 +166,6 @@ unsigned int getBitrate(const string &content, size_t pos = 0) {
     bitset<4> bs{ (i >> 4) };
     unsigned int bitrate = bs.to_ulong();
     return bitrate;
-}
-
-// Create a frame that is unavailable to play: with bad bit rate and reserved sample rate
-string cp_cr8_header(string &content, int oriBitrate, int oriSamprate){
-	size_t pos = ((content[6] & 0x7F) << 21) + ((content[7] & 0x7F) << 14) + ((content[8] & 0x7F) << 7) + (content[9] & 0x7F) + 10;
-    // Skip info tag
-    for(int i = 0; i < 2; ++i)
-        pos = findNextFrame(content, pos + 1);
-    string header = content.substr(pos, 4);
-    header[2] |= 0xfc;
-    return header;
 }
 
 void writeSample(unsigned int sample, string &content, size_t pos) {
