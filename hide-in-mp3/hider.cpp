@@ -26,8 +26,12 @@ int main(int argc, char* argv[]){
     if(argc == 3){
         string contain = readFile(argv[1]);
         string secret = readFile(argv[2]);
-        string scr_ext = string(argv[2]).substr(string(argv[2]).find_last_of('.') + 1);
-        secret.insert(0, to_string(scr_ext.size()) + scr_ext);
+
+        // Insert the extenstion name (along with the name length).
+        size_t dot_pos = string(argv[2]).find_last_of('.') + 1;
+        string scr_ext = (dot_pos == 0 ? "" : string(argv[2]).substr(dot_pos));
+        secret =  (to_string(scr_ext.size()) + scr_ext) + secret;
+
         encode(contain, secret);
         return 0;
     }
@@ -42,31 +46,31 @@ int main(int argc, char* argv[]){
 }
 
 void encode(string &contain, string &secret){
-    secret.insert(0, "^:_;");
-    secret += "!@*%";
+  // Identity to the secret.
+  secret =  "^:_;" + secret + "!@*%";
 
 	// Skiping the id3v2 tag
 	size_t pos = ((contain[6] & 0x7F) << 21) + ((contain[7] & 0x7F) << 14) + ((contain[8] & 0x7F) << 7) + (contain[9] & 0x7F) + 10;
 	// Skip info tag.
-    for(int i = 0; i < 3; ++i)
-        pos = findNextFrame(contain, pos + 1);
+  for(int i = 0; i < 3; ++i)
+    pos = findNextFrame(contain, pos + 1);
 
-    string header = cp_cr8_header(contain, getBitrate(contain, pos), getSample(contain, pos));
+  string header = cp_cr8_header(contain, getBitrate(contain, pos), getSample(contain, pos));
 
-    size_t len = getFrameLen(header, 0) - 4;
-    size_t process = 0;
+  size_t len = getFrameLen(header, 0) - 4;
+  size_t process = 0;
 	while(process <= secret.size()){
-        string frame = header;
-        if((secret.size() - process) / len){
-            frame += secret.substr(process, len);
-        }
-        else{
-            frame += secret.substr(process, secret.size() - process);
-            frame += string(len - secret.size() + process, '\0');
-        }
-        contain.insert(pos, frame);
-        pos += len + 4;
-        process += len;
+    string frame = header;
+    if((secret.size() - process) / len){
+        frame += secret.substr(process, len);
+    }
+    else{
+        frame += secret.substr(process, secret.size() - process);
+        frame += string(len - secret.size() + process, '\0');
+    }
+    contain.insert(pos, frame);
+    pos += len + 4;
+    process += len;
 	}
 	writeFile(contain, "output.mp3");
 }
@@ -95,9 +99,11 @@ void decode(string &contain){
     }
     secret.erase(0, secret.find("^:_;") + 4);
     secret.erase(secret.find("!@*%"), secret.find("!@*%") + 4 - secret.size());
+
     string ext = secret.substr(1, secret[0] - '0');
+    ext = ext.size() ? ("." + ext) : "";
     secret.erase(0, secret[0] - '0' + 1);
-    writeFile(secret, "secret." + ext);
+    writeFile(secret, "secret" + ext);
 }
 
 string readFile(char path[]) {
