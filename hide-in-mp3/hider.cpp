@@ -27,10 +27,11 @@ int main(int argc, char* argv[]){
         string contain = readFile(argv[1]);
         string secret = readFile(argv[2]);
 
-        // Insert the extenstion name (along with the name length).
+        // Insert the size of secret file and the extenstion name (along with the name length).
         size_t dot_pos = string(argv[2]).find_last_of('.') + 1;
         string scr_ext = (dot_pos == 0 ? "" : string(argv[2]).substr(dot_pos));
-        secret =  (to_string(scr_ext.size()) + scr_ext) + secret;
+
+        secret = (to_string(secret.size()) + ".") + (to_string(scr_ext.size()) + scr_ext) + secret;
 
         encode(contain, secret);
         return 0;
@@ -48,7 +49,6 @@ int main(int argc, char* argv[]){
 void encode(string &contain, string &secret){
   // Identity to the secret.
   secret =  "^:_;" + secret + "!@*%";
-
 	// Skiping the id3v2 tag
 	size_t pos = ((contain[6] & 0x7F) << 21) + ((contain[7] & 0x7F) << 14) + ((contain[8] & 0x7F) << 7) + (contain[9] & 0x7F) + 10;
 	// Skip info tag.
@@ -59,6 +59,7 @@ void encode(string &contain, string &secret){
 
   size_t len = getFrameLen(header, 0) - 4;
   size_t process = 0;
+  string buffer;
 	while(process <= secret.size()){
     string frame = header;
     if((secret.size() - process) / len){
@@ -68,10 +69,10 @@ void encode(string &contain, string &secret){
         frame += secret.substr(process, secret.size() - process);
         frame += string(len - secret.size() + process, '\0');
     }
-    contain.insert(pos, frame);
-    pos += len + 4;
+    buffer += frame;
     process += len;
 	}
+  contain.insert(pos, buffer);
 	writeFile(contain, "output.mp3");
 }
 
@@ -92,17 +93,22 @@ void decode(string &contain){
 
     while(pos != string::npos){
         string frame = contain.substr(pos + 4, len);
-        secret += frame;
-        if(frame.find("!@*%") != string::npos)
+        if(frame.find("!@*%") != string::npos){
+          size_t dot_pos = secret.find_first_of(".");
+          size_t secret_size = stoi(secret.substr(4, dot_pos - 4));
+          frame = frame.substr(0, frame.find("!@*%"));
+          secret += frame;
+          if(secret.size() > secret_size) {
+            secret = secret.substr(dot_pos + 1);
             break;
+          }
+        }
+        secret += frame;
         pos = findNextFrame(contain, pos + len + 4);
     }
-    secret.erase(0, secret.find("^:_;") + 4);
-    secret.erase(secret.find("!@*%"), secret.find("!@*%") + 4 - secret.size());
-
     string ext = secret.substr(1, secret[0] - '0');
     ext = ext.size() ? ("." + ext) : "";
-    secret.erase(0, secret[0] - '0' + 1);
+    secret = secret.substr(secret[0] - '0' + 1, secret.size() - (secret[0] - '0') - 1);
     writeFile(secret, "secret" + ext);
 }
 
